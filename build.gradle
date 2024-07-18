@@ -1,0 +1,152 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '2.7.18'
+	id 'io.spring.dependency-management' version '1.1.5'
+	id 'distribution'
+}
+
+group = 'com.vmware.gemfire.restapi'
+version = '1.0.0'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(11)
+	}
+}
+configurations {
+	distribution
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springdoc:springdoc-openapi-ui:1.6.12'
+	compileOnly 'org.springframework.data:spring-data-geode'
+	compileOnly 'org.apache.geode:geode-core:1.13.5'
+	compileOnly 'org.apache.geode:geode-gfsh:1.13.5'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+jar {
+	archiveFileName.set("restapi-1.0.0.jar")
+}
+
+import groovy.xml.*
+
+final jbossModuleName = "com.vmware.gemfire.restapi:1"
+
+// Task to generate module.xml
+tasks.register("generateModuleXml") { task ->
+	final file = file(task.temporaryDir.toPath().resolve("module.xml"))
+	doLast {
+		file.withWriter { writer ->
+			def xml = new MarkupBuilder(new IndentPrinter(writer, "  ", true))
+
+			xml.doubleQuotes = true
+			xml.mkp.xmlDeclaration(version: '1.0', encoding: 'utf-8')
+			xml.mkp.comment("Copyright (c) VMware, Inc. 2022. All rights reserved.")
+			xml.mkp.yield('\n')
+			xml.module(xmlns: 'urn:jboss:module:1.9', 'name': jbossModuleName) {
+				resources {
+                    'resource-root'('path': tasks.named('jar').get().outputs.files.singleFile.name)
+					configurations.runtimeClasspath.files.each { dep ->
+						'resource-root'('path': dep.name)
+					}
+				}
+				delegate.dependencies {
+					module('name': 'java.se', 'export': 'false', 'optional': 'false', 'services': 'import')
+					module('name': 'gemfire', 'export': 'false', 'optional': 'false', 'services': 'none')
+				}
+				"exports" {
+					"exclude"('path': 'org/springframework/**')
+					"exclude"('path': 'org/apache/lucene/**')
+					"exclude"('path': 'org/slf4j/**')
+					"include"('path' : 'com/vmware/gemfire/api/extension/**' )
+				}
+			}
+		}
+	}
+	outputs.file(file)
+}
+
+distributions {
+	extension {
+		distributionBaseName = "vmware-gemfire-restapi"
+		contents {
+			with copySpec {
+				into(jbossModuleName.replaceAll('[.:]', '/'))
+				from(jar)
+				from(configurations.runtimeClasspath)
+				from(generateModuleXml)
+			}
+			with copySpec {
+				from('src/main/dist')
+			}
+		}
+	}
+}
+extensionDistZip {
+	eachFile { file ->
+		String path = file.relativePath
+		file.setPath(path.substring(path.indexOf("/")+1,path.length()))
+	}
+//	archiveFileName.set("gemfire-api-extension-1.0.0.gfm")
+	archiveExtension.set("gfm")
+}
+
+extensionDistTar {
+	enabled = false
+}
+
+
+//def distributionBaseName = "vmware.gemfire.api.extension"
+//task distributions {
+//		contents {
+//			with copySpec {
+//				into(jbossModuleName.replaceAll('[.:]', '/'))
+//				from(jar)
+//				from(configurations.runtimeClasspath)
+//				from(generateModuleXml)
+//			}
+//			with copySpec {
+//				from('src/main/dist')
+//			}
+//		}
+//}
+//
+////def baseName = "gemfire-api-extension-1.0.0"
+////// Task to create folder structure
+////task createFolderStructure(type: Copy) {
+////
+////	with copySpec {
+////		into(jbossModuleName.replaceAll('[.:]', '/')) {
+////			from(jar)
+////			from(configurations.runtimeClasspath)
+////			from(generateModuleXml)
+////		}
+////	}
+////	into("$buildDir/$baseName")
+////	with copySpec {
+////		from('src/main/dist')
+////	}
+////	into("$buildDir/$baseName")
+////}
+//
+//// Task to create a zip file of the folder structure
+//task extensionDistZip(type: Zip) {
+//	dependsOn distributions
+//	from files(buildDir.path + "/distributions")
+////	from("$buildDir/$baseName")
+//	archiveFileName.set("gemfire-api-extension-1.0.0.gfm")
+//	archiveExtension.set("gfm")
+//}
+
+//build.dependsOn generateModuleXml, distributions, extensionDistZip
