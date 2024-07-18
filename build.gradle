@@ -10,7 +10,7 @@ version = '1.0.0'
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(11)
+		languageVersion = JavaLanguageVersion.of(8)
 	}
 }
 configurations {
@@ -105,48 +105,3 @@ extensionDistZip {
 extensionDistTar {
 	enabled = false
 }
-
-
-//def distributionBaseName = "vmware.gemfire.api.extension"
-//task distributions {
-//		contents {
-//			with copySpec {
-//				into(jbossModuleName.replaceAll('[.:]', '/'))
-//				from(jar)
-//				from(configurations.runtimeClasspath)
-//				from(generateModuleXml)
-//			}
-//			with copySpec {
-//				from('src/main/dist')
-//			}
-//		}
-//}
-//
-////def baseName = "gemfire-api-extension-1.0.0"
-////// Task to create folder structure
-////task createFolderStructure(type: Copy) {
-////
-////	with copySpec {
-////		into(jbossModuleName.replaceAll('[.:]', '/')) {
-////			from(jar)
-////			from(configurations.runtimeClasspath)
-////			from(generateModuleXml)
-////		}
-////	}
-////	into("$buildDir/$baseName")
-////	with copySpec {
-////		from('src/main/dist')
-////	}
-////	into("$buildDir/$baseName")
-////}
-//
-//// Task to create a zip file of the folder structure
-//task extensionDistZip(type: Zip) {
-//	dependsOn distributions
-//	from files(buildDir.path + "/distributions")
-////	from("$buildDir/$baseName")
-//	archiveFileName.set("gemfire-api-extension-1.0.0.gfm")
-//	archiveExtension.set("gfm")
-//}
-
-//build.dependsOn generateModuleXml, distributions, extensionDistZip
