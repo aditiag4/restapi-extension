@@ -10,33 +10,68 @@ version = '1.0.0'
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(8)
+		languageVersion = JavaLanguageVersion.of(11)
 	}
-}
-configurations {
-	distribution
 }
 
 repositories {
 	mavenCentral()
+	maven {
+		url = uri("gcs://spring-gemfire-build-resources/maven")
+	}
+}
+
+jar {
+	archiveFileName.set("restapi-1.0.0.jar")
+}
+
+configurations {
+	extensionsClasspath {
+		extendsFrom configurations.runtimeClasspath
+		exclude group: 'org.slf4j', module: 'jul-to-slf4j'
+		exclude group: 'org.slf4j', module: 'slf4j-api'
+		exclude group: 'ch.qos.logback', module: 'logback-classic'
+		exclude group:'org.apache.logging.log4j', module:"log4j-to-slf4j"
+		exclude group:"org.springframework", module: "spring-context"
+		exclude group:"org.springframework", module:"spring-context-support"
+		exclude group:"org.springframework", module:"spring-core"
+		exclude group:"org.springframework", module:"spring-beans"
+		exclude group:"org.springframework", module:"spring-jcl"
+
+		exclude group:"org.springframework.boot", module:"spring-boot-starter-logging"
+
+		exclude group:"com.fasterxml.jackson.datatype", module:"jackson-datatype-jsr310"
+		exclude group:"com.fasterxml.jackson.datatype", module:"jackson-datatype-jdk8"
+		exclude group:"com.fasterxml.jackson.module", module:"jackson-module-parameter-names"
+		exclude group:"com.fasterxml.jackson.core", module:"jackson-databind"
+		exclude group:"com.fasterxml.jackson.core", module:"jackson-annotations"
+		exclude group:"com.fasterxml.jackson.core", module:"jackson-core"
+
+		exclude group:"org.apache.tomcat.embed", module:"tomcat-embed-websocket"
+		exclude group:"org.apache.tomcat.embed", module:"tomcat-embed-core"
+		exclude group:"org.apache.tomcat.embed", module:"tomcat-embed-el"
+
+
+		exclude group:"commons-io", module:"commons-io"
+		exclude group:"com.google.guava", module:"guava"
+		exclude group:"org.apache.shiro"
+	}
 }
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springdoc:springdoc-openapi-ui:1.6.12'
-	compileOnly 'org.springframework.data:spring-data-geode'
+//	compileOnly 'org.springframework.data:spring-data-geode'
 	compileOnly 'org.apache.geode:geode-core:1.13.5'
 	compileOnly 'org.apache.geode:geode-gfsh:1.13.5'
+//	implementation 'org.apache.geode:geode-membership:1.13.5'
+	//implementation 'org.springframework.boot:spring-boot-starter-security'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
-}
-
-jar {
-	archiveFileName.set("restapi-1.0.0.jar")
 }
 
 import groovy.xml.*
@@ -55,22 +90,22 @@ tasks.register("generateModuleXml") { task ->
 			xml.mkp.comment("Copyright (c) VMware, Inc. 2022. All rights reserved.")
 			xml.mkp.yield('\n')
 			xml.module(xmlns: 'urn:jboss:module:1.9', 'name': jbossModuleName) {
-				resources {
-                    'resource-root'('path': tasks.named('jar').get().outputs.files.singleFile.name)
-					configurations.runtimeClasspath.files.each { dep ->
+				"resources" {
+					configurations.getByName("extensionsClasspath").files.forEach() { dep ->
 						'resource-root'('path': dep.name)
 					}
+					'resource-root'('path': tasks.getByName('jar').archiveFile.get().asFile.name)
 				}
 				delegate.dependencies {
 					module('name': 'java.se', 'export': 'false', 'optional': 'false', 'services': 'import')
-					module('name': 'gemfire', 'export': 'false', 'optional': 'false', 'services': 'none')
+					module('name': 'gemfire', 'export': 'false', 'optional': 'false', 'services': 'import')
 				}
-				"exports" {
-					"exclude"('path': 'org/springframework/**')
-					"exclude"('path': 'org/apache/lucene/**')
-					"exclude"('path': 'org/slf4j/**')
-					"include"('path' : 'com/vmware/gemfire/api/extension/**' )
-				}
+//				"exports" {
+//					"exclude"('path': 'org/springframework/**')
+//					"exclude"('path': 'org/apache/lucene/**')
+//					"exclude"('path': 'org/slf4j/**')
+//					"include"('path' : 'com/vmware/gemfire/api/extension/**' )
+//				}
 			}
 		}
 	}
@@ -83,8 +118,8 @@ distributions {
 		contents {
 			with copySpec {
 				into(jbossModuleName.replaceAll('[.:]', '/'))
-				from(jar)
-				from(configurations.runtimeClasspath)
+				from(configurations.getByName("extensionsClasspath"))
+				from(tasks.jar.archiveFile)
 				from(generateModuleXml)
 			}
 			with copySpec {
